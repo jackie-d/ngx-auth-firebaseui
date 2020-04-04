@@ -97,9 +97,10 @@ export class AuthProcessService implements ISignInProcess, ISignUpProcess {
    * @param provider - the provider to authenticate with (google, facebook, twitter, github)
    * @param credentials
    */
-  public async signInWith(provider: AuthProvider, credentials?: ICredentials) {
+  public async signInWith(provider: AuthProvider, credentials?: ICredentials, withRedirect = false) {
     try {
       let signInResult: UserCredential | any;
+      let thirdPartyProvider: AuthProvider;
 
       switch (provider) {
         case AuthProvider.ANONYMOUS:
@@ -111,31 +112,13 @@ export class AuthProcessService implements ISignInProcess, ISignUpProcess {
           break;
 
         case AuthProvider.Google:
-          signInResult = await this.afa.auth.signInWithPopup(googleAuthProvider) as UserCredential;
-          break;
-
         case AuthProvider.Apple:
-          signInResult = await this.afa.auth.signInWithPopup(appleAuthProvider) as UserCredential;
-          break;
-
         case AuthProvider.Facebook:
-          signInResult = await this.afa.auth.signInWithPopup(facebookAuthProvider) as UserCredential;
-          break;
-
         case AuthProvider.Twitter:
-          signInResult = await this.afa.auth.signInWithPopup(twitterAuthProvider) as UserCredential;
-          break;
-
         case AuthProvider.Github:
-          signInResult = await this.afa.auth.signInWithPopup(githubAuthProvider) as UserCredential;
-          break;
-
         case AuthProvider.Microsoft:
-          signInResult = await this.afa.auth.signInWithPopup(microsoftAuthProvider) as UserCredential;
-          break;
-
         case AuthProvider.Yahoo:
-          signInResult = await this.afa.auth.signInWithPopup(yahooAuthProvider) as UserCredential;
+          thirdPartyProvider = provider;
           break;
 
         case AuthProvider.PhoneNumber:
@@ -144,6 +127,18 @@ export class AuthProcessService implements ISignInProcess, ISignUpProcess {
 
         default:
           throw new Error(`${AuthProvider[provider]} is not available as auth provider`);
+      }
+      if ( thirdPartyProvider ) {
+        if ( !withRedirect ) {
+          signInResult = await this.afa.auth.signInWithPopup(thirdPartyProvider) as UserCredential;
+        } else {
+          signInResult = await this.afa.auth.signInWithRedirect(thirdPartyProvider).then(result => {
+            if (!result.credential) {
+              throw new Error(`${AuthProvider[provider]} sign in hasn't returned a valid user`);
+            } 
+            return result.credential as UserCredential;
+          });
+        }
       }
       await this.handleSuccess(signInResult);
     } catch (err) {
